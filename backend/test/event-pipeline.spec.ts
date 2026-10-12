@@ -127,4 +127,18 @@ describe('Milestone 1.4: Event Ingestion & Deterministic Detection Pipeline', ()
     expect(updateAudit).toBeDefined();
     expect(updateAudit.details.newStatus).toBe('INVESTIGATING');
   });
+
+  it('5. should reject malformed event payloads with 400 Bad Request (input validation)', async () => {
+    // Missing required sourceIp and eventType
+    const malformedRes = await request(app.getHttpServer())
+      .post('/api/v1/events/ingest')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        targetUser: 'attacker',
+        sourcePort: 999999, // Invalid port > 65535
+      });
+
+    expect(malformedRes.status).toBe(400);
+    expect(malformedRes.body.message).toBeDefined();
+  });
 });

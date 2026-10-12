@@ -137,4 +137,13 @@ describe('Milestone 1.3: Authentication, RBAC & Security Integration Tests', () 
       }
     }
   });
+
+  it('10. should successfully log out authenticated user and record audit log', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/auth/logout')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(response.status).toBe(201);
+    expect(response.body.message).toBe('Logged out successfully');
+  });
 });

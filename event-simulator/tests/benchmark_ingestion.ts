@@ -3,19 +3,30 @@
  * Measures baseline response latency and events/sec throughput over 100 synthetic events.
  */
 
-import axios from 'axios';
-
 const API_URL = process.env.API_URL || 'http://localhost:4000/api/v1';
 const BATCH_SIZE = 100;
 
 async function benchmark() {
   console.log(`[BENCHMARK] Connecting to ${API_URL}...`);
-  const loginRes = await axios.post(`${API_URL}/auth/login`, {
-    email: 'admin@sentinelx.local',
-    password: 'AdminPassword123!',
+  const loginRes = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'admin@sentinelx.local',
+      password: 'AdminPassword123!',
+    }),
   });
-  const token = loginRes.data.accessToken;
-  const headers = { Authorization: `Bearer ${token}` };
+
+  if (!loginRes.ok) {
+    throw new Error(`Login failed with status ${loginRes.status}: ${await loginRes.text()}`);
+  }
+
+  const loginData = (await loginRes.json()) as any;
+  const token = loginData.accessToken;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
 
   console.log(`[BENCHMARK] Commencing ingestion of ${BATCH_SIZE} events...`);
   const latencies: number[] = [];
@@ -23,16 +34,21 @@ async function benchmark() {
 
   for (let i = 0; i < BATCH_SIZE; i++) {
     const start = Date.now();
-    await axios.post(
-      `${API_URL}/events/ingest`,
-      {
+    const res = await fetch(`${API_URL}/events/ingest`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
         eventType: 'AUTH_FAILURE',
         sourceIp: `10.200.0.${(i % 20) + 1}`,
         targetUser: `user_${i}`,
         rawPayload: { iteration: i },
-      },
-      { headers },
-    );
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Event ${i} ingest failed: ${await res.text()}`);
+    }
+
     latencies.push(Date.now() - start);
   }
 
