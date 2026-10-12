@@ -1,5 +1,14 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { Role } from '../users/entities/role.entity';
+import { User } from '../users/entities/user.entity';
+import { Asset } from '../assets/entities/asset.entity';
+import { SecurityEvent } from '../events/entities/security-event.entity';
+import { Detection } from '../detections/entities/detection.entity';
+import { Incident } from '../incidents/entities/incident.entity';
+import { AuditLog } from '../audit/entities/audit-log.entity';
+
+export const ALL_ENTITIES = [Role, User, Asset, SecurityEvent, Detection, Incident, AuditLog];
 
 export const databaseConfig = registerAs(
   'database',
@@ -10,8 +19,7 @@ export const databaseConfig = registerAs(
     username: process.env.DB_USERNAME || 'piyushdubey',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'sentinelx',
-    entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-    // CRITICAL: synchronize must remain FALSE in all environments to enforce migration safety
+    entities: ALL_ENTITIES,
     synchronize: false,
     logging: process.env.DB_LOGGING === 'true',
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,

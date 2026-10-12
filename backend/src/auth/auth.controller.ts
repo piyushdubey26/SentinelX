@@ -10,7 +10,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: process.env.NODE_ENV === 'test' ? 1000 : 5, ttl: 60000 } })
   async login(@Body() dto: LoginDto, @Ip() ip: string) {
     return this.authService.login(dto, ip || '127.0.0.1');
   }

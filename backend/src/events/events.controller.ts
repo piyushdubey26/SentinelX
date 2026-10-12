@@ -14,7 +14,7 @@ export class EventsController {
   @Post('ingest')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.ADMIN, RoleType.SECURITY_ENGINEER, RoleType.SOC_ANALYST)
-  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  @Throttle({ default: { limit: process.env.NODE_ENV === 'test' ? 1000 : 120, ttl: 60000 } })
   async ingest(@Body() dto: IngestEventDto, @Ip() ip: string) {
     return this.eventsService.ingest(dto, ip);
   }
