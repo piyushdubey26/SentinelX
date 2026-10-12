@@ -46,7 +46,7 @@ export const DEFAULT_CORRELATION_CONFIG: CorrelationScoringConfig = {
   autoPromotionThreshold: 0.85, // Score to automatically trigger confirmed incident creation
   weights: {
     sharedIdentity: 0.35,
-    sharedAsset: 0.30,
+    sharedAsset: 0.25,
     attackProgression: 0.25,
     networkTargetPair: 0.15,
   },

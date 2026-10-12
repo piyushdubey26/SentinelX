@@ -171,7 +171,7 @@ describe('Milestone 2.2: Event Correlation Engine, Candidate Lifecycle & Anti-IP
       expect(res2.candidate.eventIds).toContain(saved2.id);
 
       // Multi-attribute score: Identity (0.35) + Attack Progression (0.25) + Reinforced IP (0.15) = 0.75
-      expect(res2.candidate.confidenceScore).toBeGreaterThanOrEqual(0.70);
+      expect(res2.candidate.confidenceScore).toBe(0.75);
       expect(res2.candidate.explanation).toContain('Correlated with cluster');
       expect(res2.candidate.explanation).toContain('Shared target identity');
       expect(
@@ -179,6 +179,124 @@ describe('Milestone 2.2: Event Correlation Engine, Candidate Lifecycle & Anti-IP
           (f) => f.factorType === CorrelationFactorType.SHARED_IDENTITY,
         ),
       ).toBe(true);
+    });
+
+    it('BOUNDARY TEST (BELOW THRESHOLD): score 0.350 < 0.500 (Identity alone across different IPs) should not correlate', async () => {
+      const now = new Date();
+      const user = 'boundary-sub-user@sentinelx.local';
+
+      // Event 1 from IP 1
+      const event1 = await eventRepo.save(
+        eventRepo.create({
+          eventType: 'AUTH_FAILURE',
+          sourceIp: '198.51.100.111',
+          targetUser: user,
+          eventTimestamp: now,
+        }),
+      );
+
+      // Event 2 from DIFFERENT IP 2 (Identity alone: 0.350 < 0.500)
+      const event2 = await eventRepo.save(
+        eventRepo.create({
+          eventType: 'AUTH_FAILURE',
+          sourceIp: '198.51.100.112',
+          targetUser: user,
+          eventTimestamp: new Date(now.getTime() + 5000),
+        }),
+      );
+      const comparison = correlationEngine.compareEvents(event1, event2);
+      expect(comparison.score).toBe(0.35);
+      expect(comparison.isCorrelated).toBe(false); // Below 0.50 threshold!
+    });
+
+    it('BOUNDARY TEST (EXACTLY AT THRESHOLD 0.500): score 0.500 = 0.500 (Identity 0.35 + Reinforced IP 0.15) correlates', async () => {
+      const now = new Date();
+      const user = 'boundary-threshold-user@sentinelx.local';
+      const ip = '198.51.100.150';
+
+      const event1 = await eventRepo.save(
+        eventRepo.create({
+          eventType: 'AUTH_FAILURE',
+          sourceIp: ip,
+          targetUser: user,
+          eventTimestamp: now,
+        }),
+      );
+
+      // Event 2: Same User + Same IP (Score: 0.35 + 0.15 = 0.500)
+      const event2 = await eventRepo.save(
+        eventRepo.create({
+          eventType: 'AUTH_FAILURE',
+          sourceIp: ip,
+          targetUser: user,
+          eventTimestamp: new Date(now.getTime() + 8000),
+        }),
+      );
+      const comparison = correlationEngine.compareEvents(event1, event2);
+      expect(comparison.score).toBe(0.5);
+      expect(comparison.isCorrelated).toBe(true); // Meets 0.50 threshold!
+    });
+
+    it('BOUNDARY TEST (EXACTLY AT THRESHOLD 0.500 via ASSET+PROGRESSION): score 0.500 (Asset 0.25 + Progression 0.25) correlates', async () => {
+      const now = new Date();
+      const mockAssetId = 'aaaaaaa1-1111-1111-1111-111111111111'; // auth-gateway-prod-01 from seed
+
+      // Event 1: Port scan on asset from IP 1
+      const event1 = await eventRepo.save(
+        eventRepo.create({
+          eventType: 'PORT_SCAN',
+          sourceIp: '198.51.100.201',
+          assetId: mockAssetId,
+          eventTimestamp: now,
+        }),
+      );
+
+      // Event 2: Exploit attempt on same asset from IP 2
+      // Score: Asset (0.25) + Progression PORT_SCAN->EXPLOIT_ATTEMPT (0.25) = 0.500 >= 0.500
+      const event2 = await eventRepo.save(
+        eventRepo.create({
+          eventType: 'EXPLOIT_ATTEMPT',
+          sourceIp: '198.51.100.202',
+          assetId: mockAssetId,
+          eventTimestamp: new Date(now.getTime() + 15000),
+        }),
+      );
+      const comparison = correlationEngine.compareEvents(event1, event2);
+      expect(comparison.score).toBe(0.5);
+      expect(comparison.isCorrelated).toBe(true);
+    });
+
+    it('BOUNDARY TEST (FULL SATURATION): score 1.000 when all 4 dimensions match without artificial clipping', async () => {
+      const now = new Date();
+      const mockAssetId = 'aaaaaaa1-1111-1111-1111-111111111111';
+      const ip = '198.51.100.250';
+      const user = 'admin-victim';
+
+      const event1 = await eventRepo.save(
+        eventRepo.create({
+          eventType: 'AUTH_FAILURE',
+          sourceIp: ip,
+          targetUser: user,
+          assetId: mockAssetId,
+          eventTimestamp: now,
+        }),
+      );
+
+      // Event 2: Same IP + Same User + Same Asset + Attack Progression (AUTH_FAILURE -> PRIVILEGE_ESCALATION)
+      // Score: Identity (0.35) + Asset (0.25) + Progression (0.25) + IP (0.15) = 1.000 exactly!
+      const event2 = await eventRepo.save(
+        eventRepo.create({
+          eventType: 'PRIVILEGE_ESCALATION',
+          sourceIp: ip,
+          targetUser: user,
+          assetId: mockAssetId,
+          eventTimestamp: new Date(now.getTime() + 20000),
+        }),
+      );
+      const comparison = correlationEngine.compareEvents(event1, event2);
+      expect(comparison.score).toBe(1.0);
+      expect(comparison.isCorrelated).toBe(true);
+      expect(comparison.factors.length).toBe(4);
     });
   });
 
@@ -339,6 +457,47 @@ describe('Milestone 2.2: Event Correlation Engine, Candidate Lifecycle & Anti-IP
         where: { id: originalIncidentId },
       });
       expect(matchingIncidents.length).toBe(1);
+    });
+
+    it('CONCURRENCY: should handle simultaneous concurrent promotion requests and create exactly one incident', async () => {
+      // Create a fresh candidate specifically for concurrency test
+      const event = await eventRepo.save(
+        eventRepo.create({
+          eventType: 'SUSPICIOUS_PROCESS',
+          severity: EventSeverity.CRITICAL,
+          sourceIp: '198.51.100.95',
+          targetUser: 'concurrent-user',
+          eventTimestamp: new Date(),
+        }),
+      );
+      const { candidate: concurrentCandidate } = await correlationService.processEvent(event);
+
+      // Fire 3 simultaneous promotion requests concurrently
+      const [res1, res2, res3] = await Promise.all([
+        request(app.getHttpServer())
+          .post(`/api/v1/correlation/candidates/${concurrentCandidate.id}/promote`)
+          .set('Authorization', `Bearer ${adminToken}`),
+        request(app.getHttpServer())
+          .post(`/api/v1/correlation/candidates/${concurrentCandidate.id}/promote`)
+          .set('Authorization', `Bearer ${adminToken}`),
+        request(app.getHttpServer())
+          .post(`/api/v1/correlation/candidates/${concurrentCandidate.id}/promote`)
+          .set('Authorization', `Bearer ${adminToken}`),
+      ]);
+
+      // All 3 succeed with 201
+      expect(res1.status).toBe(201);
+      expect(res2.status).toBe(201);
+      expect(res3.status).toBe(201);
+
+      // All 3 share the EXACT SAME promoted incident ID
+      expect(res1.body.incidentId).toBeDefined();
+      expect(res2.body.incidentId).toBe(res1.body.incidentId);
+      expect(res3.body.incidentId).toBe(res1.body.incidentId);
+
+      // Strictly verify only ONE incident exists for this candidate
+      const count = await incidentRepo.count({ where: { id: res1.body.incidentId } });
+      expect(count).toBe(1);
     });
 
     it('should dismiss candidate incident with analyst reason', async () => {

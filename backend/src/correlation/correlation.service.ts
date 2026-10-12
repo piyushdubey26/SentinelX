@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { CandidateIncident } from './entities/candidate-incident.entity';
 import {
   CandidateClusterState,
@@ -28,6 +28,7 @@ export class CorrelationService {
   constructor(
     @InjectRepository(CandidateIncident)
     private readonly candidateRepo: Repository<CandidateIncident>,
+    private readonly dataSource: DataSource,
     private readonly incidentsService: IncidentsService,
     private readonly auditService: AuditService,
   ) {
@@ -168,62 +169,66 @@ export class CorrelationService {
    * Fully idempotent: returns existing promoted state if called again.
    */
   async promoteCandidate(id: string, userId?: string, ipAddress?: string): Promise<CandidateIncident> {
-    const candidate = await this.candidateRepo.findOne({
-      where: { id },
-      relations: ['primaryAsset', 'incident'],
+    return await this.dataSource.transaction(async (manager) => {
+      // Pessimistic write lock on candidate_incidents row alone (strict row locking, avoiding PostgreSQL outer-join limitation)
+      const candidate = await manager
+        .createQueryBuilder(CandidateIncident, 'candidate')
+        .setLock('pessimistic_write')
+        .where('candidate.id = :id', { id })
+        .getOne();
+
+      if (!candidate) {
+        throw new NotFoundException(`Candidate incident with id ${id} not found`);
+      }
+
+      // Idempotent guard: if already promoted by a concurrent transaction
+      if (candidate.status === CandidateIncidentStatus.PROMOTED && candidate.incidentId) {
+        this.logger.warn(`[CorrelationService] Candidate ${id} is already promoted. Returning existing incident.`);
+        return candidate;
+      }
+
+      if (candidate.status === CandidateIncidentStatus.DISMISSED) {
+        throw new BadRequestException(`Cannot promote a dismissed candidate incident (${id}).`);
+      }
+
+      // Create official incident
+      const incident = await this.incidentsService.createFromCandidate({
+        id: candidate.id,
+        title: candidate.title,
+        explanation: candidate.explanation,
+        confidenceScore: candidate.confidenceScore,
+        severity: candidate.severity,
+        primarySourceIp: candidate.primarySourceIp,
+        detectionIds: candidate.detectionIds,
+      });
+
+      candidate.status = CandidateIncidentStatus.PROMOTED;
+      candidate.incidentId = incident.id;
+      candidate.incident = incident;
+
+      const saved = await manager.save(CandidateIncident, candidate);
+
+      // Update in-memory engine cluster
+      const cluster = this.engine.getCluster(id);
+      if (cluster) {
+        cluster.status = CandidateIncidentStatus.PROMOTED;
+      }
+
+      await this.auditService.logAction({
+        userId,
+        action: 'CANDIDATE_MANUALLY_PROMOTED',
+        resourceType: 'CANDIDATE_INCIDENT',
+        resourceId: saved.id,
+        ipAddress,
+        details: {
+          incidentId: incident.id,
+          incidentCode: incident.code,
+          confidenceScore: saved.confidenceScore,
+        },
+      });
+
+      return saved;
     });
-
-    if (!candidate) {
-      throw new NotFoundException(`Candidate incident with id ${id} not found`);
-    }
-
-    // Idempotent guard
-    if (candidate.status === CandidateIncidentStatus.PROMOTED && candidate.incidentId) {
-      this.logger.warn(`[CorrelationService] Candidate ${id} is already promoted. Returning existing incident.`);
-      return candidate;
-    }
-
-    if (candidate.status === CandidateIncidentStatus.DISMISSED) {
-      throw new BadRequestException(`Cannot promote a dismissed candidate incident (${id}).`);
-    }
-
-    // Atomic promotion using optimistic check
-    const incident = await this.incidentsService.createFromCandidate({
-      id: candidate.id,
-      title: candidate.title,
-      explanation: candidate.explanation,
-      confidenceScore: candidate.confidenceScore,
-      severity: candidate.severity,
-      primarySourceIp: candidate.primarySourceIp,
-      detectionIds: candidate.detectionIds,
-    });
-
-    candidate.status = CandidateIncidentStatus.PROMOTED;
-    candidate.incidentId = incident.id;
-    candidate.incident = incident;
-
-    const saved = await this.candidateRepo.save(candidate);
-
-    // Update in-memory engine cluster
-    const cluster = this.engine.getCluster(id);
-    if (cluster) {
-      cluster.status = CandidateIncidentStatus.PROMOTED;
-    }
-
-    await this.auditService.logAction({
-      userId,
-      action: 'CANDIDATE_MANUALLY_PROMOTED',
-      resourceType: 'CANDIDATE_INCIDENT',
-      resourceId: saved.id,
-      ipAddress,
-      details: {
-        incidentId: incident.id,
-        incidentCode: incident.code,
-        confidenceScore: saved.confidenceScore,
-      },
-    });
-
-    return saved;
   }
 
   /**

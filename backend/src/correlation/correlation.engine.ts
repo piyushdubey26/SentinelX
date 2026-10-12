@@ -76,8 +76,8 @@ export class CorrelationEngine {
   } {
     const timestampMs = new Date(event.eventTimestamp).getTime();
 
-    // 1. Candidate Retrieval: O(1) average lookup via entity indexes
-    const candidateClusterIds = this.findCandidateClusterIds(event);
+    // 1. Candidate Retrieval: O(1) average lookup via entity indexes (Identity and Asset anchors)
+    const { candidateIds, hasSharedIpOnly, sampleIpClusterId } = this.findCandidateClusterIds(event);
 
     let bestCluster: CandidateClusterState | undefined = undefined;
     let bestEvaluation: CorrelationEvaluationResult = {
@@ -90,7 +90,7 @@ export class CorrelationEngine {
       shouldAutoPromote: false,
     };
 
-    for (const clusterId of candidateClusterIds) {
+    for (const clusterId of candidateIds) {
       const cluster = this.clusters.get(clusterId);
       if (!cluster || cluster.status !== CandidateIncidentStatus.CANDIDATE) {
         continue;
@@ -104,25 +104,31 @@ export class CorrelationEngine {
       }
 
       const evalResult = this.evaluateMatch(event, cluster, detection);
-      if (evalResult.isCorrelated && evalResult.score > bestEvaluation.score) {
-        bestEvaluation = evalResult;
-        bestCluster = cluster;
+      if (evalResult.isCorrelated) {
+        if (
+          evalResult.score > bestEvaluation.score ||
+          (evalResult.score === bestEvaluation.score &&
+            bestCluster &&
+            cluster.lastSeen > bestCluster.lastSeen)
+        ) {
+          bestEvaluation = evalResult;
+          bestCluster = cluster;
+        }
       }
     }
 
-    // If no cluster matched, evaluate standalone rejection/evidence for the event
-    if (!bestCluster && candidateClusterIds.length > 0) {
-      // Evaluate first candidate cluster to capture rejection factors (e.g. anti-IP-bleeding)
-      const firstCandidate = this.clusters.get(candidateClusterIds[0]);
-      if (firstCandidate) {
-        bestEvaluation = this.evaluateMatch(event, firstCandidate, detection);
+    // If no primary cluster matched, check if IP matched an existing cluster to provide anti-IP-bleeding evidence
+    if (!bestCluster && hasSharedIpOnly && sampleIpClusterId) {
+      const sampleCluster = this.clusters.get(sampleIpClusterId);
+      if (sampleCluster) {
+        bestEvaluation = this.evaluateMatch(event, sampleCluster, detection);
       }
     }
 
     return {
       matchedCluster: bestCluster,
       evaluation: bestEvaluation,
-      candidateClusterIds,
+      candidateClusterIds: candidateIds,
     };
   }
 
@@ -302,7 +308,8 @@ export class CorrelationEngine {
       }
       cluster.confidenceScore = Math.max(cluster.confidenceScore, evalResult.evaluation.score);
       cluster.severity = evalResult.evaluation.suggestedSeverity;
-      cluster.factors = [...cluster.factors, ...evalResult.evaluation.factors];
+      const combinedFactors = [...cluster.factors, ...evalResult.evaluation.factors];
+      cluster.factors = combinedFactors.slice(-10);
       cluster.explanation = evalResult.evaluation.explanation;
 
       // Update secondary indexes if cluster acquired new identity/asset
@@ -443,7 +450,11 @@ export class CorrelationEngine {
 
   // --- Private Helper Methods ---
 
-  private findCandidateClusterIds(event: SecurityEvent): string[] {
+  private findCandidateClusterIds(event: SecurityEvent): {
+    candidateIds: string[];
+    hasSharedIpOnly: boolean;
+    sampleIpClusterId?: string;
+  } {
     const candidateSet = new Set<string>();
 
     if (event.targetUser) {
@@ -460,14 +471,22 @@ export class CorrelationEngine {
       }
     }
 
+    let hasSharedIpOnly = false;
+    let sampleIpClusterId: string | undefined = undefined;
+
     if (event.sourceIp) {
       const ipClusters = this.ipIndex.get(event.sourceIp);
-      if (ipClusters) {
-        for (const id of ipClusters) candidateSet.add(id);
+      if (ipClusters && ipClusters.size > 0) {
+        hasSharedIpOnly = true;
+        sampleIpClusterId = ipClusters.values().next().value;
       }
     }
 
-    return Array.from(candidateSet);
+    return {
+      candidateIds: Array.from(candidateSet),
+      hasSharedIpOnly,
+      sampleIpClusterId,
+    };
   }
 
   private addIndex(indexMap: Map<string, Set<string>>, key: string, id: string): void {
