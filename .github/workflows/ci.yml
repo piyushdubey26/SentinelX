@@ -61,7 +61,7 @@ jobs:
           DB_NAME: sentinelx
           DB_TEST_NAME: sentinelx_test
           JWT_SECRET: ci-test-jwt-secret-key-32-characters-minimum
-        run: cd backend && npm test -- --runInBand --passWithNoTests
+        run: cd backend && npx jest --config test/jest-all.json --runInBand --verbose --forceExit
 
   frontend-checks:
     name: Frontend Build & Typecheck

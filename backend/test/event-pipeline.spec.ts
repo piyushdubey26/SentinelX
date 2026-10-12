@@ -6,6 +6,8 @@ import { AppModule } from '../src/app.module';
 describe('Milestone 1.4: Event Ingestion & Deterministic Detection Pipeline', () => {
   let app: INestApplication;
   let adminToken: string;
+  const attackIp = '198.51.100.42';
+  const targetUser = 'victim_admin';
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -41,9 +43,6 @@ describe('Milestone 1.4: Event Ingestion & Deterministic Detection Pipeline', ()
   });
 
   it('1. should persist 4 failed login events without triggering detection', async () => {
-    const attackIp = '198.51.100.42';
-    const targetUser = 'victim_admin';
-
     for (let i = 1; i <= 4; i++) {
       const res = await request(app.getHttpServer())
         .post('/api/v1/events/ingest')
@@ -65,10 +64,6 @@ describe('Milestone 1.4: Event Ingestion & Deterministic Detection Pipeline', ()
   });
 
   it('2. should trigger detection and generate incident on 5th failed attempt', async () => {
-    const attackIp = '198.51.100.42';
-    const targetUser = 'victim_admin';
-
-    // 5th event in window
     const res = await request(app.getHttpServer())
       .post('/api/v1/events/ingest')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -87,28 +82,30 @@ describe('Milestone 1.4: Event Ingestion & Deterministic Detection Pipeline', ()
 
   it('3. should verify newly generated incident is queryable via Incidents API', async () => {
     const res = await request(app.getHttpServer())
-      .get('/api/v1/incidents?limit=10')
+      .get('/api/v1/incidents?limit=20')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(res.status).toBe(200);
     expect(res.body.data).toBeDefined();
     expect(res.body.total).toBeGreaterThanOrEqual(1);
 
-    const incident = res.body.data[0];
+    const incident = res.body.data.find((inc: any) => inc.sourceIp === attackIp);
+    expect(incident).toBeDefined();
     expect(incident.code).toMatch(/^INC-\d+/);
     expect(incident.status).toBe('OPEN');
-    expect(incident.sourceIp).toBe('198.51.100.42');
+    expect(incident.sourceIp).toBe(attackIp);
     expect(incident.detection).toBeDefined();
     expect(incident.detection.ruleId).toBe('RULE-BRUTE-FORCE-001');
     expect(incident.detection.triggerCount).toBe(5);
   });
 
   it('4. should update incident status with analyst audit log', async () => {
-    // Fetch incident id
     const listRes = await request(app.getHttpServer())
-      .get('/api/v1/incidents?limit=1')
+      .get('/api/v1/incidents?limit=20')
       .set('Authorization', `Bearer ${adminToken}`);
-    const incidentId = listRes.body.data[0].id;
+    const incident = listRes.body.data.find((inc: any) => inc.sourceIp === attackIp);
+    expect(incident).toBeDefined();
+    const incidentId = incident.id;
 
     // Update status to INVESTIGATING
     const updateRes = await request(app.getHttpServer())
@@ -121,7 +118,7 @@ describe('Milestone 1.4: Event Ingestion & Deterministic Detection Pipeline', ()
 
     // Verify audit log
     const auditRes = await request(app.getHttpServer())
-      .get('/api/v1/audit/logs?limit=5')
+      .get('/api/v1/audit/logs?limit=20')
       .set('Authorization', `Bearer ${adminToken}`);
     expect(auditRes.status).toBe(200);
     const updateAudit = auditRes.body.data.find(
