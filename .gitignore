@@ -1,0 +1,47 @@
+# Operating System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Environment & Secrets (NEVER COMMIT SECRETS)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+
+# Node.js / NPM / Yarn
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Python / AI Service
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.pytest_cache/
+
+# Docker & Database
+*.sql.gz
+*.dump
+pgdata/
+
+# IDE
+.vscode/
+.idea/
