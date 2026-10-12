@@ -162,7 +162,7 @@ export class CorrelationEngine {
       }
     }
 
-    // 2. Shared Asset Dimension (Weight: 0.30)
+    // 2. Shared Asset Dimension (Weight: 0.25)
     let assetMatched = false;
     if (event.assetId && cluster.primaryAssetId) {
       if (event.assetId === cluster.primaryAssetId) {
