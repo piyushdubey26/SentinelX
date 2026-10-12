@@ -7,8 +7,20 @@ import { SecurityEvent } from '../events/entities/security-event.entity';
 import { Detection } from '../detections/entities/detection.entity';
 import { Incident } from '../incidents/entities/incident.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
+import { IdempotencyKey } from '../streaming/entities/idempotency-key.entity';
+import { DeadLetterEvent } from '../streaming/entities/dead-letter-event.entity';
 
-export const ALL_ENTITIES = [Role, User, Asset, SecurityEvent, Detection, Incident, AuditLog];
+export const ALL_ENTITIES = [
+  Role,
+  User,
+  Asset,
+  SecurityEvent,
+  Detection,
+  Incident,
+  AuditLog,
+  IdempotencyKey,
+  DeadLetterEvent,
+];
 
 export const databaseConfig = registerAs(
   'database',

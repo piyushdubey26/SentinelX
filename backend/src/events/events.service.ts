@@ -1,53 +1,39 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { SecurityEvent, EventSeverity } from './entities/security-event.entity';
+import { SecurityEvent } from './entities/security-event.entity';
 import { IngestEventDto } from './dto/ingest-event.dto';
-import { DetectionsService } from '../detections/detections.service';
+import { StreamingService } from '../streaming/streaming.service';
 
 @Injectable()
 export class EventsService {
   constructor(
     @InjectRepository(SecurityEvent)
     private readonly eventRepo: Repository<SecurityEvent>,
-    private readonly detectionsService: DetectionsService,
+    private readonly streamingService: StreamingService,
   ) {}
 
-  async ingest(dto: IngestEventDto, clientIp?: string): Promise<{
-    event: SecurityEvent;
+  async ingest(
+    dto: IngestEventDto,
+    clientIp?: string,
+    sync: boolean = true,
+  ): Promise<{
+    event?: SecurityEvent;
     detectionCreated: boolean;
     incidentCreated: boolean;
+    trackingId?: string;
+    idempotencyKey?: string;
+    status?: string;
   }> {
-    const eventTimestamp = dto.eventTimestamp ? new Date(dto.eventTimestamp) : new Date();
-
-    const normalizedDetails = {
-      normalizedSourceIp: dto.sourceIp,
-      normalizedTargetUser: dto.targetUser ? dto.targetUser.toLowerCase().trim() : undefined,
-      ingestedFromIp: clientIp,
-      protocol: 'HTTPS',
-    };
-
-    const event = this.eventRepo.create({
-      eventType: dto.eventType,
-      severity: dto.severity || EventSeverity.INFO,
-      sourceIp: dto.sourceIp,
-      sourcePort: dto.sourcePort,
-      destinationIp: dto.destinationIp,
-      targetUser: dto.targetUser,
-      rawPayload: dto.rawPayload || {},
-      normalizedDetails,
-      eventTimestamp,
-    });
-
-    const savedEvent = await this.eventRepo.save(event);
-
-    // Evaluate detection rules
-    const detectionResult = await this.detectionsService.processEvent(savedEvent);
+    const streamResult = await this.streamingService.ingestEvent(dto, clientIp, sync);
 
     return {
-      event: savedEvent,
-      detectionCreated: !!detectionResult.detection,
-      incidentCreated: detectionResult.incidentCreated,
+      event: streamResult.event,
+      detectionCreated: !!streamResult.detectionCreated,
+      incidentCreated: !!streamResult.incidentCreated,
+      trackingId: streamResult.trackingId,
+      idempotencyKey: streamResult.idempotencyKey,
+      status: streamResult.status,
     };
   }
 

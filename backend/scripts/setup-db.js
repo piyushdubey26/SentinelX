@@ -27,19 +27,29 @@ async function setup() {
   }
   await rootClient.end();
 
-  // 2. Read migration and seed SQL
-  const migrationSqlPath = path.resolve(__dirname, '../../database/migrations/001_initial_soc_schema.sql');
-  const seedSqlPath = path.resolve(__dirname, '../../database/seeds/001_initial_roles_and_admin.sql');
+  // 2. Discover and sort migration SQL files
+  const migrationsDir = path.resolve(__dirname, '../../database/migrations');
+  const migrationFiles = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql') && !f.endsWith('_down.sql'))
+    .sort();
 
-  const migrationSql = fs.readFileSync(migrationSqlPath, 'utf8');
+  const seedSqlPath = path.resolve(__dirname, '../../database/seeds/001_initial_roles_and_admin.sql');
   const seedSql = fs.readFileSync(seedSqlPath, 'utf8');
 
-  // 3. Apply schema and seeds to both sentinelx and sentinelx_test
+  // 3. Apply all schema migrations and seeds to both sentinelx and sentinelx_test
   for (const db of dbs) {
-    console.log(`[SETUP-DB] Applying schema & seeds to ${db}...`);
+    console.log(`[SETUP-DB] Applying schema migrations & seeds to ${db}...`);
     const dbClient = new Client({ host, port, user, password, database: db, ssl });
     await dbClient.connect();
-    await dbClient.query(migrationSql);
+
+    for (const mFile of migrationFiles) {
+      console.log(`[SETUP-DB] -> Running migration ${mFile} on ${db}...`);
+      const mSql = fs.readFileSync(path.join(migrationsDir, mFile), 'utf8');
+      await dbClient.query(mSql);
+    }
+
+    console.log(`[SETUP-DB] -> Running seed on ${db}...`);
     await dbClient.query(seedSql);
     await dbClient.end();
     console.log(`[SETUP-DB] Completed setup for ${db}.`);
