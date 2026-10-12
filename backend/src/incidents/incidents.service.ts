@@ -49,6 +49,43 @@ export class IncidentsService {
     return saved;
   }
 
+  async createFromCandidate(candidate: {
+    id: string;
+    title: string;
+    explanation: string;
+    confidenceScore: number;
+    severity: EventSeverity;
+    primarySourceIp?: string;
+    detectionIds?: string[];
+  }): Promise<Incident> {
+    const code = await this.generateNextCode();
+    const incident = this.incidentRepo.create({
+      code,
+      title: `[CORRELATED] ${candidate.title}`,
+      summary: `Correlated Incident promoted from candidate cluster ${candidate.id}. Confidence: ${candidate.confidenceScore}. ${candidate.explanation}`,
+      severity: candidate.severity,
+      status: IncidentStatus.OPEN,
+      sourceIp: candidate.primarySourceIp,
+      detectionId: candidate.detectionIds && candidate.detectionIds.length > 0 ? candidate.detectionIds[0] : undefined,
+    });
+
+    const saved = await this.incidentRepo.save(incident);
+
+    await this.auditService.logAction({
+      action: 'INCIDENT_PROMOTED_FROM_CANDIDATE',
+      resourceType: 'INCIDENT',
+      resourceId: saved.id,
+      details: {
+        code: saved.code,
+        candidateId: candidate.id,
+        confidenceScore: candidate.confidenceScore,
+        severity: saved.severity,
+      },
+    });
+
+    return saved;
+  }
+
   async findAll(options?: {
     status?: IncidentStatus;
     severity?: EventSeverity;

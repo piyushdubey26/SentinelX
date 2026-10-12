@@ -11,6 +11,7 @@ import { SecurityEventEnvelope, StreamMessage, StreamingStats } from './streamin
 import { IngestEventDto } from '../events/dto/ingest-event.dto';
 import { SecurityEvent, EventSeverity } from '../events/entities/security-event.entity';
 import { DetectionsService } from '../detections/detections.service';
+import { CorrelationService } from '../correlation/correlation.service';
 
 export const RAW_EVENTS_TOPIC = 'security.events.raw';
 export const DLQ_TOPIC = 'security.events.dlq';
@@ -29,7 +30,13 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
   // Transient listeners for synchronous completion (e.g., tests or ?sync=true)
   private readonly eventWaiters = new Map<
     string,
-    (res: { event: SecurityEvent; detectionCreated: boolean; incidentCreated: boolean }) => void
+    (res: {
+      event: SecurityEvent;
+      detectionCreated: boolean;
+      incidentCreated: boolean;
+      candidateCreated?: boolean;
+      candidateId?: string;
+    }) => void
   >();
 
   constructor(
@@ -41,6 +48,7 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(SecurityEvent)
     private readonly eventRepo: Repository<SecurityEvent>,
     private readonly detectionsService: DetectionsService,
+    private readonly correlationService: CorrelationService,
   ) {}
 
   async onModuleInit() {
@@ -87,6 +95,8 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
     event?: SecurityEvent;
     detectionCreated?: boolean;
     incidentCreated?: boolean;
+    candidateCreated?: boolean;
+    candidateId?: string;
   }> {
     const envelope = this.normalizer.normalize(dto, clientIp);
 
@@ -95,6 +105,8 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
       event: SecurityEvent;
       detectionCreated: boolean;
       incidentCreated: boolean;
+      candidateCreated?: boolean;
+      candidateId?: string;
     }> | null = null;
 
     if (waitForSync) {
@@ -131,6 +143,8 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
             event: syncResult.event,
             detectionCreated: syncResult.detectionCreated,
             incidentCreated: syncResult.incidentCreated,
+            candidateCreated: syncResult.candidateCreated,
+            candidateId: syncResult.candidateId,
           };
         }
       } catch (err) {
@@ -205,6 +219,11 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
       attempt,
     );
 
+    const waiter = this.eventWaiters.get(envelope.envelopeId);
+    if (waiter) {
+      this.eventWaiters.delete(envelope.envelopeId);
+    }
+
     // Also publish dead letter event to DLQ topic for external stream consumers
     await this.driver.publish(DLQ_TOPIC, {
       topic: DLQ_TOPIC,
@@ -243,6 +262,12 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
     // Evaluate detection
     const detectionResult = await this.detectionsService.processEvent(savedEvent);
 
+    // Evaluate multi-attribute correlation
+    const correlationResult = await this.correlationService.processEvent(
+      savedEvent,
+      detectionResult.detection,
+    );
+
     // Notify any synchronous waiters
     const waiter = this.eventWaiters.get(envelope.envelopeId);
     if (waiter) {
@@ -250,7 +275,9 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
       waiter({
         event: savedEvent,
         detectionCreated: !!detectionResult.detection,
-        incidentCreated: detectionResult.incidentCreated,
+        incidentCreated: detectionResult.incidentCreated || correlationResult.autoPromoted,
+        candidateCreated: correlationResult.isNewCandidate,
+        candidateId: correlationResult.candidate.id,
       });
     }
   }

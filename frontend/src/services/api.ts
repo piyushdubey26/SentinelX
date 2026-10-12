@@ -83,3 +83,23 @@ export const updateIncidentStatusApi = async (id: string, status: IncidentStatus
   const response = await apiClient.patch<Incident>(`/incidents/${id}/status`, { status });
   return response.data;
 };
+
+export const getCandidatesApi = async (params?: {
+  limit?: number;
+  offset?: number;
+  status?: string;
+  minConfidence?: number;
+}): Promise<{ data: any[]; total: number }> => {
+  const response = await apiClient.get<{ data: any[]; total: number }>('/correlation/candidates', { params });
+  return response.data;
+};
+
+export const promoteCandidateApi = async (id: string): Promise<any> => {
+  const response = await apiClient.post(`/correlation/candidates/${id}/promote`);
+  return response.data;
+};
+
+export const dismissCandidateApi = async (id: string, reason: string): Promise<any> => {
+  const response = await apiClient.post(`/correlation/candidates/${id}/dismiss`, { reason });
+  return response.data;
+};

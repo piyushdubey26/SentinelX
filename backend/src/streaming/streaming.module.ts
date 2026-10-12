@@ -10,11 +10,13 @@ import { EmbeddedStreamingDriver } from './drivers/embedded-streaming.driver';
 import { KafkaStreamingDriver } from './drivers/kafka-streaming.driver';
 import { StreamingService } from './streaming.service';
 import { DetectionsModule } from '../detections/detections.module';
+import { CorrelationModule } from '../correlation/correlation.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([IdempotencyKey, DeadLetterEvent, SecurityEvent]),
     forwardRef(() => DetectionsModule),
+    CorrelationModule,
   ],
   providers: [
     EventNormalizerService,

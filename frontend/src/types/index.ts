@@ -73,3 +73,33 @@ export interface BackendHealth {
   };
   version: string;
 }
+
+export interface CorrelationFactor {
+  factorType: string;
+  weight: number;
+  contribution: number;
+  description: string;
+  evidence: Record<string, any>;
+}
+
+export interface CandidateIncident {
+  id: string;
+  title: string;
+  summary: string;
+  confidenceScore: number;
+  severity: Severity;
+  status: 'CANDIDATE' | 'PROMOTED' | 'DISMISSED';
+  correlationFactors: CorrelationFactor[];
+  explanation: string;
+  primaryUser?: string;
+  primarySourceIp?: string;
+  primaryAssetId?: string;
+  eventIds: string[];
+  detectionIds: string[];
+  incidentId?: string;
+  dismissedReason?: string;
+  firstSeen: string;
+  lastSeen: string;
+  createdAt: string;
+  updatedAt: string;
+}

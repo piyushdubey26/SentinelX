@@ -21,6 +21,8 @@ export class EventsService {
     event?: SecurityEvent;
     detectionCreated: boolean;
     incidentCreated: boolean;
+    candidateCreated?: boolean;
+    candidateId?: string;
     trackingId?: string;
     idempotencyKey?: string;
     status?: string;
@@ -31,6 +33,8 @@ export class EventsService {
       event: streamResult.event,
       detectionCreated: !!streamResult.detectionCreated,
       incidentCreated: !!streamResult.incidentCreated,
+      candidateCreated: streamResult.candidateCreated,
+      candidateId: streamResult.candidateId,
       trackingId: streamResult.trackingId,
       idempotencyKey: streamResult.idempotencyKey,
       status: streamResult.status,

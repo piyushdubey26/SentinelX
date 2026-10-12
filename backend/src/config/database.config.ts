@@ -9,6 +9,7 @@ import { Incident } from '../incidents/entities/incident.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
 import { IdempotencyKey } from '../streaming/entities/idempotency-key.entity';
 import { DeadLetterEvent } from '../streaming/entities/dead-letter-event.entity';
+import { CandidateIncident } from '../correlation/entities/candidate-incident.entity';
 
 export const ALL_ENTITIES = [
   Role,
@@ -20,6 +21,7 @@ export const ALL_ENTITIES = [
   AuditLog,
   IdempotencyKey,
   DeadLetterEvent,
+  CandidateIncident,
 ];
 
 export const databaseConfig = registerAs(
