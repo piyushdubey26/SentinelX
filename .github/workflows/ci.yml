@@ -45,7 +45,7 @@ jobs:
 
       - name: Initialize Databases & Seeds
         env:
-          DB_HOST: localhost
+          DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_USERNAME: sentinelx
           DB_PASSWORD: sentinelx_password
@@ -54,14 +54,27 @@ jobs:
       - name: Run Unit & Integration Tests
         env:
           NODE_ENV: test
-          DB_HOST: localhost
+          DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_USERNAME: sentinelx
           DB_PASSWORD: sentinelx_password
           DB_NAME: sentinelx
           DB_TEST_NAME: sentinelx_test
           JWT_SECRET: ci-test-jwt-secret-key-32-characters-minimum
-        run: cd backend && npx jest --config test/jest-all.json --runInBand --verbose --forceExit
+        run: |
+          cd backend
+          set -o pipefail
+          npx jest --config test/jest-all.json --runInBand --verbose --forceExit 2>&1 | tee test-output.log
+
+      - name: Publish Test Summary
+        if: always()
+        run: |
+          if [ -f backend/test-output.log ]; then
+            echo "### Jest Test Output" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            cat backend/test-output.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
 
   frontend-checks:
     name: Frontend Build & Typecheck

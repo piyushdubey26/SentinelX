@@ -3,8 +3,8 @@
   "rootDir": "..",
   "testRegex": ".*\\.spec\\.ts$",
   "testPathIgnorePatterns": [
-    "/node_modules/",
-    "/dist/"
+    "node_modules",
+    "dist"
   ],
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
