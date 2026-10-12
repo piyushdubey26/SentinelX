@@ -10,33 +10,74 @@ jobs:
   backend-checks:
     name: Backend Build & Unit Tests
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: sentinelx
+          POSTGRES_PASSWORD: sentinelx_password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: backend/package.json
+
       - name: Install Dependencies
         run: cd backend && npm ci
+
       - name: Run Build
         run: cd backend && npm run build
-      - name: Run Unit Tests
+
+      - name: Initialize Databases & Seeds
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: sentinelx
+          DB_PASSWORD: sentinelx_password
+        run: cd backend && node scripts/setup-db.js
+
+      - name: Run Unit & Integration Tests
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: sentinelx
+          DB_PASSWORD: sentinelx_password
+          DB_NAME: sentinelx
+          DB_TEST_NAME: sentinelx_test
+          JWT_SECRET: ci-test-jwt-secret-key-32-characters-minimum
         run: cd backend && npm test -- --passWithNoTests
 
   frontend-checks:
     name: Frontend Build & Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: frontend/package.json
+
       - name: Install Dependencies
         run: cd frontend && npm ci
+
       - name: Run Build
         run: cd frontend && npm run build

@@ -17,7 +17,7 @@ describe('Milestone 1.2: PostgreSQL Schema & Constraints Integration Tests', () 
       port: parseInt(process.env.DB_PORT || '5432', 10),
       username: process.env.DB_USERNAME || 'piyushdubey',
       password: process.env.DB_PASSWORD || '',
-      database: 'sentinelx_test',
+      database: process.env.DB_TEST_NAME || 'sentinelx_test',
       entities: [Role, User, Asset, SecurityEvent, Detection, Incident, AuditLog],
       synchronize: false,
     });
