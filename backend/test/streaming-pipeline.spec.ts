@@ -160,4 +160,61 @@ describe('Milestone 2.1: Streaming Pipeline, Idempotency, DLQ & Consumer Health'
     expect(res.body.event.id).toBeDefined();
     expect(new Date(res.body.event.eventTimestamp).getTime()).toBe(new Date(olderTimestamp).getTime());
   });
+
+  it('6. should handle consumer restart gracefully and resume message consumption', async () => {
+    // 1. Simulate consumer restart cycle
+    await streamingService.onModuleDestroy();
+    const statsOffline = await streamingService.getStats();
+    expect(statsOffline.status).toBe('DISCONNECTED');
+
+    // 2. Re-initialize consumer
+    await streamingService.onModuleInit();
+    const statsOnline = await streamingService.getStats();
+    expect(statsOnline.status).toBe('CONNECTED');
+
+    // 3. Verify event ingestion immediately succeeds after restart
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/events/ingest?sync=true')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        eventType: 'AUTH_FAILURE',
+        sourceIp: '10.0.99.55',
+        rawPayload: { restarted: true },
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('PROCESSED');
+    expect(res.body.event.sourceIp).toBe('10.0.99.55');
+  });
+
+  it('7. should successfully recover after transient failures within retry threshold', async () => {
+    // Simulate a transient error during processEnvelope
+    let transientCount = 0;
+    const originalProcess = (streamingService as any).processEnvelope.bind(streamingService);
+
+    // Mock first execution to fail once transiently, then succeed on retry attempt 2
+    jest.spyOn(streamingService as any, 'processEnvelope').mockImplementation(async (envelope: any) => {
+      if (envelope.rawPayload?.testTransient && transientCount === 0) {
+        transientCount++;
+        throw new Error('Simulated transient DB connection timeout');
+      }
+      return originalProcess(envelope);
+    });
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/events/ingest?sync=true')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        eventType: 'AUTH_FAILURE',
+        sourceIp: '10.0.88.77',
+        rawPayload: { testTransient: true },
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('PROCESSED');
+    expect(transientCount).toBe(1); // Transient error occurred and was recovered
+
+    // Restore original method
+    (streamingService as any).processEnvelope.mockRestore();
+  });
 });
