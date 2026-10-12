@@ -23,11 +23,11 @@ ON CONFLICT (hostname) DO NOTHING;
 INSERT INTO users (id, email, password_hash, first_name, last_name, role_id, is_active)
 VALUES
   ('99999999-9999-9999-9999-999999999999', 'admin@sentinelx.local', '$2b$10$WWeUevFbL9QUMwcZOgHEIeFpvPWOLccMm50md8vE8PFTuogM3dhGa', 'Sentinel', 'Administrator', '11111111-1111-1111-1111-111111111111', true)
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 -- Insert SOC Analyst User (password: AnalystPassword123!)
--- Hash for AnalystPassword123!: $2b$10$WWeUevFbL9QUMwcZOgHEIeFpvPWOLccMm50md8vE8PFTuogM3dhGa (reusing test hash for dev seed)
+-- Hash for AnalystPassword123!: $2b$10$bGZCKA6dxLzpH9RPiVZ9BOIjtfVzwuOzH5pF4ExBXnuDHdgfb9.La
 INSERT INTO users (id, email, password_hash, first_name, last_name, role_id, is_active)
 VALUES
-  ('88888888-8888-8888-8888-888888888888', 'analyst@sentinelx.local', '$2b$10$WWeUevFbL9QUMwcZOgHEIeFpvPWOLccMm50md8vE8PFTuogM3dhGa', 'Alice', 'Analyst', '33333333-3333-3333-3333-333333333333', true)
-ON CONFLICT (email) DO NOTHING;
+  ('88888888-8888-8888-8888-888888888888', 'analyst@sentinelx.local', '$2b$10$bGZCKA6dxLzpH9RPiVZ9BOIjtfVzwuOzH5pF4ExBXnuDHdgfb9.La', 'Alice', 'Analyst', '33333333-3333-3333-3333-333333333333', true)
+ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
