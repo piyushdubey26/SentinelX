@@ -15,6 +15,7 @@ import { RiskModule } from './risk/risk.module';
 import { AuditModule } from './audit/audit.module';
 import { StreamingModule } from './streaming/streaming.module';
 import { CorrelationModule } from './correlation/correlation.module';
+import { InvestigationsModule } from './investigations/investigations.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { CorrelationModule } from './correlation/correlation.module';
     DetectionsModule,
     IncidentsModule,
     CorrelationModule,
+    InvestigationsModule,
     RiskModule,
   ],
   providers: [

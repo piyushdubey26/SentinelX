@@ -103,3 +103,37 @@ export const dismissCandidateApi = async (id: string, reason: string): Promise<a
   const response = await apiClient.post(`/correlation/candidates/${id}/dismiss`, { reason });
   return response.data;
 };
+
+// ==========================================
+// Milestone 2.3 Graph Investigation API
+// ==========================================
+
+export const getIncidentGraphApi = async (
+  incidentId: string,
+  params?: { maxHops?: number; timeWindowHours?: number; includeEvents?: boolean },
+): Promise<any> => {
+  const response = await apiClient.get(`/investigations/incident/${incidentId}/graph`, { params });
+  return response.data;
+};
+
+export const getIncidentPathsApi = async (
+  incidentId: string,
+  params: { sourceId: string; targetId: string; maxDepth?: number },
+): Promise<any> => {
+  const response = await apiClient.get(`/investigations/incident/${incidentId}/paths`, { params });
+  return response.data;
+};
+
+export const getIncidentBlastRadiusApi = async (
+  incidentId: string,
+  params?: { maxHops?: number; timeWindowHours?: number },
+): Promise<any> => {
+  const response = await apiClient.get(`/investigations/incident/${incidentId}/blast-radius`, { params });
+  return response.data;
+};
+
+export const getIncidentCyclesApi = async (incidentId: string): Promise<any> => {
+  const response = await apiClient.get(`/investigations/incident/${incidentId}/cycles`);
+  return response.data;
+};
+

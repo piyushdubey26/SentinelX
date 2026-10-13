@@ -103,3 +103,127 @@ export interface CandidateIncident {
   createdAt: string;
   updatedAt: string;
 }
+
+// ==========================================
+// Milestone 2.3 Graph Investigation Types
+// ==========================================
+
+export type GraphNodeType =
+  | 'INCIDENT'
+  | 'SECURITY_EVENT'
+  | 'DETECTION'
+  | 'USER'
+  | 'IP_ADDRESS'
+  | 'ASSET';
+
+export type GraphEdgeType =
+  | 'AUTHENTICATED_AS'
+  | 'CONNECTED_FROM'
+  | 'TARGETED_USER'
+  | 'TARGETED_ASSET'
+  | 'RESOLVES_TO'
+  | 'TRIGGERED'
+  | 'PART_OF_INCIDENT'
+  | 'PRECEDED_BY'
+  | 'ASSOCIATED_WITH';
+
+export interface GraphNode {
+  id: string;
+  nodeType: GraphNodeType;
+  label: string;
+  properties: {
+    entityId?: string;
+    severity?: string;
+    criticality?: string;
+    environment?: string;
+    isInternal?: boolean;
+    firstSeen?: string;
+    lastSeen?: string;
+    eventCount?: number;
+    [key: string]: any;
+  };
+}
+
+export interface GraphEdge {
+  id: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  edgeType: GraphEdgeType;
+  label: string;
+  isDirected: boolean;
+  provenance: {
+    sourceRecordId?: string;
+    recordType: string;
+    timestamp: string;
+    confidence: number;
+    evidenceDetails?: Record<string, any>;
+  };
+}
+
+export interface InvestigationGraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  metadata: {
+    rootNodeId?: string;
+    nodeCount: number;
+    edgeCount: number;
+    timeWindowStart?: string;
+    timeWindowEnd?: string;
+    generatedAt: string;
+  };
+}
+
+export interface AttackPath {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  hopCount: number;
+  totalConfidence: number;
+  summary: string;
+}
+
+export interface DfsPathResult {
+  sourceNodeId: string;
+  targetNodeId: string;
+  paths: AttackPath[];
+  exploredCount: number;
+}
+
+export type BlastRadiusTier =
+  | 'CONFIRMED_OBSERVED'
+  | 'POTENTIALLY_EXPOSED'
+  | 'PERIMETER_REACHABLE';
+
+export interface BlastRadiusEntity {
+  node: GraphNode;
+  tier: BlastRadiusTier;
+  reason: string;
+  hopDistance: number;
+  supportingEventIds: string[];
+  viaNodeId?: string;
+}
+
+export interface BlastRadiusAnalysis {
+  targetNode: GraphNode;
+  directlyAffectedCount: number;
+  potentiallyExposedCount: number;
+  totalReachableCount: number;
+  entities: BlastRadiusEntity[];
+  criticalAssetsAtRisk: Array<{ assetNode: GraphNode; criticality: string; hopDistance: number }>;
+  disclaimer: string;
+}
+
+export interface DetectedCycle {
+  nodeIds: string[];
+  edgeIds: string[];
+  explanation: string;
+  participatingNodes: GraphNode[];
+  participatingEdges: GraphEdge[];
+}
+
+export interface CycleDetectionResult {
+  hasCycles: boolean;
+  cycleCount: number;
+  cycles: DetectedCycle[];
+  analysisSummary: string;
+}
+

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, ShieldAlert } from 'lucide-react';
+import { X, ShieldAlert, Network, FileText } from 'lucide-react';
 import { Incident, IncidentStatus } from '../../../types';
 import { updateIncidentStatusApi } from '../../../services/api';
+import { InvestigationGraphView } from './InvestigationGraphView';
 
 interface IncidentDetailModalProps {
   incident: Incident;
@@ -15,6 +16,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
   onStatusUpdated,
 }) => {
   const [updating, setUpdating] = useState(false);
+  const [modalTab, setModalTab] = useState<'overview' | 'graph'>('overview');
 
   const handleStatusChange = async (newStatus: IncidentStatus) => {
     setUpdating(true);
@@ -30,7 +32,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center space-x-3">
@@ -48,6 +50,32 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
             </span>
           </div>
 
+          {/* Navigation Tabs */}
+          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+            <button
+              onClick={() => setModalTab('overview')}
+              className={`px-3 py-1 rounded-md font-semibold flex items-center space-x-1.5 transition-colors ${
+                modalTab === 'overview'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Overview</span>
+            </button>
+            <button
+              onClick={() => setModalTab('graph')}
+              className={`px-3 py-1 rounded-md font-semibold flex items-center space-x-1.5 transition-colors ${
+                modalTab === 'graph'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Network className="w-3.5 h-3.5 text-blue-600" />
+              <span>Graph Investigation</span>
+            </button>
+          </div>
+
           <button
             onClick={onClose}
             className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
@@ -58,10 +86,14 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">{incident.title}</h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">{incident.summary}</p>
-          </div>
+          {modalTab === 'graph' ? (
+            <InvestigationGraphView incidentId={incident.id} />
+          ) : (
+            <>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{incident.title}</h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{incident.summary}</p>
+              </div>
 
           {/* Incident Metadata Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 rounded-xl p-4 border border-slate-100 text-xs">
@@ -156,8 +188,10 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
               )}
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
-  );
+  </div>
+</div>
+);
 };
