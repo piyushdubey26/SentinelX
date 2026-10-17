@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { AppModule } from '../src/app.module';
+import { Incident } from '../src/incidents/entities/incident.entity';
+import { SecurityEvent } from '../src/events/entities/security-event.entity';
+import { Detection } from '../src/detections/entities/detection.entity';
 
 describe('Milestone 1.4: Event Ingestion & Deterministic Detection Pipeline', () => {
   let app: INestApplication;
@@ -25,6 +29,14 @@ describe('Milestone 1.4: Event Ingestion & Deterministic Detection Pipeline', ()
     app.setGlobalPrefix('api/v1');
     await app.init();
 
+    // Clean up any stale records from previous runs
+    const incidentRepo = app.get(getRepositoryToken(Incident));
+    const eventRepo = app.get(getRepositoryToken(SecurityEvent));
+    const detectionRepo = app.get(getRepositoryToken(Detection));
+    await incidentRepo.delete({ sourceIp: attackIp });
+    await detectionRepo.delete({ sourceIp: attackIp });
+    await eventRepo.delete({ sourceIp: attackIp });
+
     // Authenticate as Admin
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
@@ -38,6 +50,14 @@ describe('Milestone 1.4: Event Ingestion & Deterministic Detection Pipeline', ()
 
   afterAll(async () => {
     if (app) {
+      try {
+        const incidentRepo = app.get(getRepositoryToken(Incident));
+        const eventRepo = app.get(getRepositoryToken(SecurityEvent));
+        const detectionRepo = app.get(getRepositoryToken(Detection));
+        await incidentRepo.delete({ sourceIp: attackIp });
+        await detectionRepo.delete({ sourceIp: attackIp });
+        await eventRepo.delete({ sourceIp: attackIp });
+      } catch {}
       await app.close();
     }
   });

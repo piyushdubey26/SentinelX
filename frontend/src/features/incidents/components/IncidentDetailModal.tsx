@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, ShieldAlert, Network, FileText } from 'lucide-react';
+import { X, ShieldAlert, Network, FileText, Zap } from 'lucide-react';
 import { Incident, IncidentStatus } from '../../../types';
 import { updateIncidentStatusApi } from '../../../services/api';
 import { InvestigationGraphView } from './InvestigationGraphView';
+import { RiskBreakdownView } from './RiskBreakdownView';
 
 interface IncidentDetailModalProps {
   incident: Incident;
@@ -16,7 +17,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
   onStatusUpdated,
 }) => {
   const [updating, setUpdating] = useState(false);
-  const [modalTab, setModalTab] = useState<'overview' | 'graph'>('overview');
+  const [modalTab, setModalTab] = useState<'overview' | 'risk' | 'graph'>('overview');
 
   const handleStatusChange = async (newStatus: IncidentStatus) => {
     setUpdating(true);
@@ -35,7 +36,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <span className="font-mono text-sm font-bold bg-slate-900 text-white px-2.5 py-1 rounded-md">
               {incident.code}
             </span>
@@ -48,13 +49,18 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
             >
               {incident.severity}
             </span>
+            {incident.riskScore !== undefined && Number(incident.riskScore) > 0 && (
+              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200">
+                Risk: {Number(incident.riskScore).toFixed(0)}/100
+              </span>
+            )}
           </div>
 
           {/* Navigation Tabs */}
           <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
             <button
               onClick={() => setModalTab('overview')}
-              className={`px-3 py-1 rounded-md font-semibold flex items-center space-x-1.5 transition-colors ${
+              className={`px-2.5 py-1 rounded-md font-semibold flex items-center space-x-1.5 transition-colors ${
                 modalTab === 'overview'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -64,15 +70,26 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
               <span>Overview</span>
             </button>
             <button
+              onClick={() => setModalTab('risk')}
+              className={`px-2.5 py-1 rounded-md font-semibold flex items-center space-x-1.5 transition-colors ${
+                modalTab === 'risk'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>Risk Scoring</span>
+            </button>
+            <button
               onClick={() => setModalTab('graph')}
-              className={`px-3 py-1 rounded-md font-semibold flex items-center space-x-1.5 transition-colors ${
+              className={`px-2.5 py-1 rounded-md font-semibold flex items-center space-x-1.5 transition-colors ${
                 modalTab === 'graph'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Network className="w-3.5 h-3.5 text-blue-600" />
-              <span>Graph Investigation</span>
+              <span>Graph</span>
             </button>
           </div>
 
@@ -88,6 +105,20 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
           {modalTab === 'graph' ? (
             <InvestigationGraphView incidentId={incident.id} />
+          ) : modalTab === 'risk' ? (
+            <RiskBreakdownView
+              incidentId={incident.id}
+              incidentCode={incident.code}
+              initialScore={incident.riskScore}
+              initialTier={incident.riskTier}
+              onScoreUpdated={(newScore, newTier) => {
+                onStatusUpdated({
+                  ...incident,
+                  riskScore: newScore,
+                  riskTier: newTier,
+                });
+              }}
+            />
           ) : (
             <>
               <div>

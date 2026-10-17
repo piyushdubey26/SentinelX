@@ -21,12 +21,16 @@ export class IncidentsController {
     @Query('severity') severity?: EventSeverity,
     @Query('limit') limit = '20',
     @Query('offset') offset = '0',
+    @Query('sortBy') sortBy?: 'riskScore' | 'createdAt',
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
   ) {
     return this.incidentsService.findAll({
       status,
       severity,
       limit: parseInt(limit, 10),
       offset: parseInt(offset, 10),
+      sortBy,
+      sortOrder,
     });
   }
 

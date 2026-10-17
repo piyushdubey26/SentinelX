@@ -52,6 +52,9 @@ export interface Incident {
     firstName: string;
     lastName: string;
   };
+  riskScore?: number;
+  riskTier?: RiskTier;
+  riskFactors?: RiskScoreBreakdown;
   createdAt: string;
   updatedAt: string;
 }
@@ -225,5 +228,56 @@ export interface CycleDetectionResult {
   cycleCount: number;
   cycles: DetectedCycle[];
   analysisSummary: string;
+}
+
+export type RiskTier = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface RiskImpactBreakdown {
+  score: number;
+  severityScore: number;
+  assetCriticalityScore: number;
+  environmentModifier: number;
+  blastRadiusScore: number;
+  assumedDefaults: string[];
+}
+
+export interface RiskConfidenceBreakdown {
+  score: number;
+  correlationScore: number;
+  velocityScore: number;
+  detectionFidelityScore: number;
+  rawEventCount: number;
+  dampenedFactor: number;
+}
+
+export interface RiskRecencyBreakdown {
+  elapsedHours: number;
+  decayMultiplier: number;
+  lastSeenTimestamp: string;
+}
+
+export interface RiskScoreBreakdown {
+  score: number;
+  tier: RiskTier;
+  components: {
+    impact: RiskImpactBreakdown;
+    confidence: RiskConfidenceBreakdown;
+    recency: RiskRecencyBreakdown;
+  };
+  explanation: string[];
+  version: string;
+  evaluatedAt: string;
+}
+
+export interface PrioritizedIncidentItem {
+  id: string;
+  code: string;
+  title: string;
+  severity: Severity;
+  riskScore: number;
+  riskTier: RiskTier;
+  riskFactors: RiskScoreBreakdown;
+  createdAt: string;
+  updatedAt: string;
 }
 

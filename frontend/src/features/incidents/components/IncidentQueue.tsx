@@ -9,6 +9,8 @@ interface IncidentQueueProps {
   total: number;
   page: number;
   pageSize: number;
+  sortBy?: 'riskScore' | 'createdAt';
+  onToggleSort?: () => void;
   onPageChange: (newPage: number) => void;
   onSelectIncident: (incident: Incident) => void;
   onRefresh: () => void;
@@ -29,6 +31,37 @@ const getSeverityClass = (severity: Severity): string => {
   }
 };
 
+const getRiskBadge = (score?: number, tier?: string) => {
+  if (score === undefined || Number(score) <= 0) return null;
+  const num = Number(score).toFixed(0);
+  switch (tier) {
+    case 'CRITICAL':
+      return (
+        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
+          Risk: {num}
+        </span>
+      );
+    case 'HIGH':
+      return (
+        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200">
+          Risk: {num}
+        </span>
+      );
+    case 'MEDIUM':
+      return (
+        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
+          Risk: {num}
+        </span>
+      );
+    default:
+      return (
+        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
+          Risk: {num}
+        </span>
+      );
+  }
+};
+
 export const IncidentQueue: React.FC<IncidentQueueProps> = ({
   incidents,
   loading,
@@ -36,6 +69,8 @@ export const IncidentQueue: React.FC<IncidentQueueProps> = ({
   total,
   page,
   pageSize,
+  sortBy = 'riskScore',
+  onToggleSort,
   onPageChange,
   onSelectIncident,
   onRefresh,
@@ -55,8 +90,16 @@ export const IncidentQueue: React.FC<IncidentQueueProps> = ({
           </span>
         </div>
         <div className="flex items-center space-x-2">
+          {onToggleSort && (
+            <button
+              onClick={onToggleSort}
+              className="text-xs px-2.5 py-1 rounded-md font-semibold border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors flex items-center space-x-1"
+            >
+              <span>Sort: {sortBy === 'riskScore' ? 'Risk Priority' : 'Recency'}</span>
+            </button>
+          )}
           {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
-          <span className="text-xs text-slate-400 font-medium">Real-time Telemetry</span>
+          <span className="text-xs text-slate-400 font-medium hidden sm:inline">Real-time Telemetry</span>
         </div>
       </div>
 
@@ -114,7 +157,8 @@ export const IncidentQueue: React.FC<IncidentQueueProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                {getRiskBadge(incident.riskScore, incident.riskTier)}
                 <span className="text-[11px] font-mono text-slate-400">
                   {incident.status}
                 </span>

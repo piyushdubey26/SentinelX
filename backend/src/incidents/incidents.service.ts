@@ -15,9 +15,27 @@ export class IncidentsService {
   ) {}
 
   private async generateNextCode(): Promise<string> {
-    const count = await this.incidentRepo.count();
-    const sequence = 2048 + count;
-    return `INC-${sequence}`;
+    const latest = await this.incidentRepo
+      .createQueryBuilder('incident')
+      .select('incident.code')
+      .where("incident.code ~ '^INC-[0-9]+$'")
+      .orderBy("CAST(SUBSTRING(incident.code FROM 5) AS INTEGER)", 'DESC')
+      .limit(1)
+      .getRawOne();
+
+    let nextSeq = 2048;
+    if (latest && latest.incident_code) {
+      const match = latest.incident_code.match(/^INC-(\d+)$/);
+      if (match) {
+        nextSeq = Math.max(nextSeq, parseInt(match[1], 10) + 1);
+      }
+    }
+
+    while (await this.incidentRepo.findOne({ where: { code: `INC-${nextSeq}` } })) {
+      nextSeq++;
+    }
+
+    return `INC-${nextSeq}`;
   }
 
   async createFromDetection(detection: Detection): Promise<Incident> {
@@ -91,14 +109,18 @@ export class IncidentsService {
     severity?: EventSeverity;
     limit?: number;
     offset?: number;
+    sortBy?: 'riskScore' | 'createdAt';
+    sortOrder?: 'ASC' | 'DESC';
   }): Promise<{ data: Incident[]; total: number }> {
     const limit = Math.min(options?.limit || 20, 100);
     const offset = options?.offset || 0;
+    const sortBy = options?.sortBy === 'riskScore' ? 'incident.riskScore' : 'incident.createdAt';
+    const sortOrder = options?.sortOrder || 'DESC';
 
     const query = this.incidentRepo.createQueryBuilder('incident')
       .leftJoinAndSelect('incident.detection', 'detection')
       .leftJoinAndSelect('incident.assignedTo', 'assignedTo')
-      .orderBy('incident.createdAt', 'DESC')
+      .orderBy(sortBy, sortOrder)
       .take(limit)
       .skip(offset);
 

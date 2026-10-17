@@ -68,6 +68,17 @@ export class Incident {
   @JoinColumn({ name: 'assigned_to_user_id' })
   assignedTo?: User;
 
+  @Index('idx_incidents_risk_score')
+  @Column({ type: 'numeric', precision: 5, scale: 2, default: 0.00, name: 'risk_score' })
+  riskScore!: number;
+
+  @Index('idx_incidents_risk_tier')
+  @Column({ type: 'varchar', length: 20, default: 'LOW', name: 'risk_tier' })
+  riskTier!: string;
+
+  @Column({ type: 'jsonb', default: {}, name: 'risk_factors' })
+  riskFactors!: Record<string, any>;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 

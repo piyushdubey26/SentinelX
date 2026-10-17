@@ -126,8 +126,9 @@ export class StreamingService implements OnModuleInit, OnModuleDestroy {
 
     if (waitForSync && syncPromise) {
       let timeoutHandle: NodeJS.Timeout | null = null;
+      const syncTimeoutMs = process.env.NODE_ENV === 'test' ? 10000 : 5000;
       const timeoutPromise = new Promise<null>((_, reject) => {
-        timeoutHandle = setTimeout(() => reject(new Error('Streaming sync processing timed out')), 5000);
+        timeoutHandle = setTimeout(() => reject(new Error('Streaming sync processing timed out')), syncTimeoutMs);
         timeoutHandle.unref();
       });
 

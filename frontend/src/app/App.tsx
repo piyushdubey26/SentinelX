@@ -36,6 +36,7 @@ export function App() {
   const pageSize = 5;
 
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [sortBy, setSortBy] = useState<'riskScore' | 'createdAt'>('riskScore');
 
   // Health Polling
   useEffect(() => {
@@ -75,6 +76,8 @@ export function App() {
         getIncidentsApi({
           limit: pageSize,
           offset: (currentPage - 1) * pageSize,
+          sortBy,
+          sortOrder: 'DESC',
         }),
         getIncidentMetricsApi(),
       ]);
@@ -87,7 +90,12 @@ export function App() {
     } finally {
       setIncidentsLoading(false);
     }
-  }, [currentUser, currentPage]);
+  }, [currentUser, currentPage, sortBy]);
+
+  const handleToggleSort = () => {
+    setSortBy((prev) => (prev === 'riskScore' ? 'createdAt' : 'riskScore'));
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     loadDashboardData();
@@ -160,6 +168,8 @@ export function App() {
                   total={totalIncidents}
                   page={currentPage}
                   pageSize={pageSize}
+                  sortBy={sortBy}
+                  onToggleSort={handleToggleSort}
                   onPageChange={(page) => setCurrentPage(page)}
                   onSelectIncident={(incident) => setSelectedIncident(incident)}
                   onRefresh={loadDashboardData}

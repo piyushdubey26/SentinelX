@@ -64,6 +64,8 @@ export const getIncidentsApi = async (params?: {
   offset?: number;
   status?: string;
   severity?: string;
+  sortBy?: 'riskScore' | 'createdAt';
+  sortOrder?: 'ASC' | 'DESC';
 }): Promise<{ data: Incident[]; total: number }> => {
   const response = await apiClient.get<{ data: Incident[]; total: number }>('/incidents', { params });
   return response.data;
@@ -134,6 +136,38 @@ export const getIncidentBlastRadiusApi = async (
 
 export const getIncidentCyclesApi = async (incidentId: string): Promise<any> => {
   const response = await apiClient.get(`/investigations/incident/${incidentId}/cycles`);
+  return response.data;
+};
+
+// ==========================================
+// Milestone 2.4 Risk Scoring & Prioritization API
+// ==========================================
+
+export const getPrioritizedIncidentsApi = async (params?: {
+  limit?: number;
+  status?: string;
+}): Promise<any[]> => {
+  const response = await apiClient.get('/risk/incidents/prioritized', { params });
+  return response.data;
+};
+
+export const getIncidentRiskBreakdownApi = async (incidentId: string): Promise<any> => {
+  const response = await apiClient.get(`/risk/incidents/${incidentId}/breakdown`);
+  return response.data;
+};
+
+export const recalculateIncidentRiskApi = async (incidentId: string): Promise<any> => {
+  const response = await apiClient.post(`/risk/incidents/${incidentId}/recalculate`);
+  return response.data;
+};
+
+export const recalculateAllRiskApi = async (): Promise<any> => {
+  const response = await apiClient.post('/risk/recalculate-all');
+  return response.data;
+};
+
+export const getRiskConfigApi = async (): Promise<any> => {
+  const response = await apiClient.get('/risk/config');
   return response.data;
 };
 
